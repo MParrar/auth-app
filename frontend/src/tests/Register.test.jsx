@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserRouter } from "react-router";
 import { AuthProvider } from "../contexts/AuthProvider";
@@ -40,8 +40,18 @@ describe("Register", () => {
     vi.mock("../utils/validations", () => ({
       isTokenValid: vi.fn().mockReturnValue(true),
       validateNewUserForm: vi.fn().mockReturnValue(true), 
-
     }));
+
+    vi.mock("axios");
+    axios.post.mockResolvedValueOnce({
+      data: { message: "User registered successfully" },
+    });
+
+    vi.stubGlobal("import.meta", {
+      env: {
+        VITE_BASE_URL: "http://mocked-url.com",
+      },
+    });
     const userForm = { name: "Sasuke", email: "email@email.com", password: "12345678", confirmPassword: "12345678", role: "user" };
     const nameInput = screen.getByTestId("form-user-name-input");
     const emailInput = screen.getByTestId("form-user-email-input");
@@ -59,19 +69,19 @@ describe("Register", () => {
       target: { value: userForm.confirmPassword },
     });
 
-    const signInSpy = vi.spyOn(axios, "post");
 
     fireEvent.click(signUpButton);
-
-    expect(signInSpy).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_BASE_URL}/users/register`,
-      {
-        name: userForm.name,
-        email: userForm.email,
-        password: userForm.password,
-        role: userForm.role
-      }
-    );
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledWith(
+        `${import.meta.env.VITE_BASE_URL}/users/register`,
+        {
+          name: userForm.name,
+          email: userForm.email,
+          password: userForm.password,
+          role: userForm.role,
+        }
+      );
+    });
   });
 
 });

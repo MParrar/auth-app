@@ -1,7 +1,7 @@
 const supertest = require('supertest');
 const { app } = require('../../src/app');
 const pool = require('../../src/config/db');
-const { generateToken } = require('../../src/utils/token');
+const jwt = require('jsonwebtoken');
 
 const userData = {
   email: 'reset@example.com',
@@ -30,7 +30,10 @@ describe('POST /reset-password', () => {
     );
 
     userId = result.rows[0].id;
-    token = generateToken(userId, userData.role, userData.sessionToken);
+    token = jwt.sign(
+        { email: userData.email },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN });
   });
 
   afterAll(async () => {

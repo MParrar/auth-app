@@ -59,9 +59,9 @@ const resetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { userId } = decoded;
+    const { email } = decoded;
 
-    await resetUserPassword(userId, token, password);
+    await resetUserPassword(email, token, password);
 
     res.status(200).json({
       status: 'success',

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Login } from "../pages/Login";
 import { BrowserRouter } from "react-router";
@@ -32,6 +32,18 @@ describe("Login", () => {
   });
 
   it("Login Action", async () => {
+    vi.mock("axios");
+
+    vi.stubGlobal("import.meta", {
+      env: {
+        VITE_BASE_URL: "http://mocked-url.com",
+      },
+    });
+
+    axios.post.mockResolvedValueOnce({
+      data: { message: "User registered successfully" },
+    });
+
     const userCredential = { email: "email@email.com", password: "12345678" };
     const emailInput = screen.getByLabelText("Email");
     const passwordInput = screen.getByLabelText("Password");
@@ -43,17 +55,17 @@ describe("Login", () => {
       target: { value: userCredential.password },
     });
 
-    const signInSpy = vi.spyOn(axios, "post");
-
     fireEvent.click(submitButton);
 
-    expect(signInSpy).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_BASE_URL}/login`,
-      {
-        email: userCredential.email,
-        password: userCredential.password,
-      }
-    );
+    await waitFor(() => {
+      expect(axios.post).toHaveBeenCalledWith(
+        `${import.meta.env.VITE_BASE_URL}/login`,
+        {
+          email: userCredential.email,
+          password: userCredential.password,
+        }
+      );
+    });
   });
 
   it("should show an error notification on failed login", async () => {

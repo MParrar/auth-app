@@ -58,7 +58,7 @@ const sendPasswordResetEmail = async (email) => {
   );
 };
 
-const resetUserPassword = async (userId, token, password) => {
+const resetUserPassword = async (email, token, password) => {
   if (!token || !password) {
     throw new Error('You need to provide token and password');
   }
@@ -67,8 +67,8 @@ const resetUserPassword = async (userId, token, password) => {
     throw new Error('The password must contain at least 8 characters');
   }
 
-  const user = await pool.query('SELECT * FROM public.user WHERE id = $1', [
-    userId,
+  const user = await pool.query('SELECT * FROM public.user WHERE email = $1', [
+    email,
   ]);
 
   if (user.rows.length === 0) {
@@ -80,7 +80,7 @@ const resetUserPassword = async (userId, token, password) => {
 
   await pool.query('UPDATE public.user SET password = $1 WHERE id = $2', [
     hashedPassword,
-    userId,
+    user.rows[0].id,
   ]);
 };
 

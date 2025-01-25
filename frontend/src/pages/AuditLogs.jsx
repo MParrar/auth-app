@@ -4,16 +4,20 @@ import { Divider } from "../components/divider";
 import axios from "axios";
 import PaginatedTable from "../components/PaginatedTable";
 import { format } from "date-fns";
+import { Loading } from "../components/Loading";
 
 export const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     axios
       .get(`${import.meta.env.VITE_BASE_URL}/admin/logs`)
       .then((res) => setLogs(res?.data?.logs))
-      .catch((err) => console.log(err));
+      .catch((err) => console.log(err))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSearchChange = (event) => {
@@ -67,6 +71,12 @@ export const AuditLogs = () => {
         headers={["User", "Action", "Date"]}
         rowsPerPage={5}
       />
+      {
+        loading &&
+        <div className="absolute inset-0 bg-black bg-opacity-50  z-20">
+          <Loading />
+        </div>
+      }
     </>
   );
 };

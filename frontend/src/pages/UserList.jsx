@@ -1,7 +1,7 @@
 
 import { Heading } from "../components/heading";
 import { Divider } from "../components/divider";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 import {
   PencilIcon,
   TrashIcon,
@@ -37,7 +37,6 @@ export const UserList = () => {
     changePassword,
     removeUser,
     createUser,
-    getUserList,
   } = useContext(AuthContext);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialogDialog] = useState(false);
@@ -63,10 +62,6 @@ export const UserList = () => {
   const isEditFormValid = Object.values(editProfileError).some(
     (err) => err !== ""
   );
-
-  useEffect(() => {
-    getUserList();
-  }, []);
 
   const openEditDialog = (user) => {
     setUserSelected(user);
@@ -166,9 +161,9 @@ export const UserList = () => {
 
   const filteredUsers = users.filter(
     (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.role.toLowerCase().includes(searchTerm.toLowerCase())
+      user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user?.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const actions = (user) => {
