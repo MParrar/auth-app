@@ -27,7 +27,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       })
       .catch((err) => {
         showNotification("error", err.response?.data?.message);
-        logout();
+        handleExpiredSession(err.response?.data?.message);
       })
       .finally(() => setIsLoading(false));
   };
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
         .then((res) => setUsers(res.data))
         .catch((err) => {
           showNotification("error", err.response?.data?.message);
-          logout();
+          handleExpiredSession(err.response?.data?.message);
         })
         .finally(() => setIsLoading(false));
     }
@@ -95,6 +95,10 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
     setUsers([]);
     navigate("/login");
   };
+
+  const handleExpiredSession = (errorMessage) => {
+    errorMessage === "Invalid or expired session" && logout()
+  }
 
   const updateUser = (id, updatedData) => {
     if (!isTokenValid(token)) {
@@ -124,7 +128,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       })
       .catch((err) => {
         showNotification("error", err.response?.data?.message);
-        logout();
+        handleExpiredSession(err.response?.data?.message);
       })
       .finally(() => setIsLoading(false));
   };
@@ -140,7 +144,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       })
       .catch((err) => {
         showNotification("error", err.response?.data?.message);
-        logout();
+        handleExpiredSession(err.response?.data?.message);
       })
       .finally(() => setIsLoading(false));
   };
@@ -170,7 +174,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       })
       .catch((err) => {
         showNotification("error", err.response?.data?.message);
-        logout();
+        handleExpiredSession(err.response?.data?.message);
       })
       .finally(() => setIsLoading(false));
   };
@@ -196,7 +200,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       })
       .catch((err) => {
         showNotification("error", err.response?.data?.message);
-        logout();
+        handleExpiredSession(err.response?.data?.message);
       })
       .finally(() => setIsLoading(false));
   };
