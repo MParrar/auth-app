@@ -4,7 +4,7 @@ export const RemoveUserConfirmation = () => {
   return (
     <p className="text-white">
             Are you sure you want to delete your account? This action will
-            permanently remove your registration.
+            permanently remove the registration.
     </p>
   )
 }
