@@ -24,7 +24,9 @@ jobs:
           npm install
 
       - name: Lint backend code
-        run: npm run lint
+        run: 
+        cd backend
+        npm run lint
 
       - name: Run backend tests
         run: |
@@ -45,7 +47,9 @@ jobs:
           npm install
 
       - name: Lint frontend code
-        run: npm run lint
+        run: 
+        cd frontend
+        npm run lint
 
       - name: Build frontend
         run: |
