@@ -19,19 +19,18 @@ git clone https://github.com/MParrar/auth-app.git
 cd auth-app
 ```
 Setup Backend \
-navigate to the backend folder and install dependencies:
+Navigate to the backend folder and install dependencies:
 ```bash
 cd backend
 npm instal 
 ```
 Create a .env file for environment variables and add variables
 ```bash
-cp .env.example .env
-PORT=5000
+PORT=<YOUR_PORT>
 DATABASE_URL=<YOUR_DATABASE_URL>
 DATABASE_URL_TEST=<YOUR_DATABASE_URL_TEST>
 JWT_SECRET=<YOUR_JWT_SECRET>
-JWT_EXPIRATION=1d
+JWT_EXPIRATION=<AMOUNT_TIME>
 FRONTEND_URL=<YOUR_FRONTEND_URL>
 API_KEY_EMAIL=<YOUR_API_KEY_FROM_MAILSENDER>
 EMAIL_SENDER=<YOUR_EMAIL_SENDER_FROM_MAILSENDER>
@@ -40,7 +39,7 @@ Start the backend server:
 ```bash
 npm run dev
 ```
-The server will be available at http://localhost:5000.
+The server will be available at http://localhost:<PORT>.
 
 Setup fronted \
 Install auth-app with npm
@@ -52,8 +51,7 @@ npm instal
 ```
 Create a .env file for environment variables and add variables
 ```bash
-cp .env.example .env
-VITE_API_URL=http://localhost:5000
+VITE_API_URL=<YOUR_API_URL>
 VITE_LOGOUT_TIMEOUT_MINUTES=<YOUR_TIME_FOR_LOG_OUT>
 ```
 Start the backend server:
@@ -68,7 +66,7 @@ The server will be available at http://localhost:5173.
 This project follows a modular full-stack architecture, dividing the application into two main components: the backend (API) and the frontend (React application). Here's an overview of the architecture:
 
 ## Backend (Node.js API)
-**Framework:** The backend is built using Express.js, a minimalist framework for building APIs.
+**Framework:** The backend is built using Express.js, a minimalist framework for building APIs.\
 **Authentication:** The project uses JWT (JSON Web Tokens) for secure user authentication. Tokens are generated upon login and validated for protected routes.\
 **Database:** The backend integrates with a relational database PostgreSQL to store user data and other resources (logs).\
 **Middleware:** Custom middleware is used for tasks like:
@@ -95,7 +93,7 @@ API calls are encapsulated in a services layer for reusability and cleaner code.
 ## Database Layer
 **Database:** The project uses PostgreSQL hosted on Neon.\
 **Schema:**
-The database contains essential tables such as users (for authentication and user details) and other table for logs.
+The database contains essential tables such as users (for authentication and user details) and other table for logs (audit_logs).
 ## CI/CD Workflow with GitHub Actions
 The project uses GitHub Actions to automate the deployment of both the frontend and backend to Vercel whenever code is pushed to the main branch. Below is a breakdown of the workflow configuration:
 
@@ -122,7 +120,10 @@ The workflow consists of a single deploy job that runs on an Ubuntu-latest runne
 ## Future Improvements
 While the current implementation is functional and deployable, there are several areas where the project could be enhanced for better scalability, maintainability, and developer experience:
 
-## Database Management with an ORM
+### Use RBAC Model
+Currently everything is stored in the user table, but this could evolve and use a model type rbac (Role-based access contro), where it contains user, role and related permissions to generate validations. 
+
+### Database Management with an ORM
 
 Currently, the database interactions are handled manually with raw SQL queries. Introducing an ORM (like Prisma or Sequelize) would:
 Simplify database queries.
@@ -130,12 +131,12 @@ Provide better abstraction and schema migrations.
 Improve developer productivity by offering type safety and reducing boilerplate code.
 Transition to a NoSQL Database
 
-## Consider migrating from PostgreSQL to a NoSQL database like MongoDB. 
+### Consider migrating from PostgreSQL to a NoSQL database like MongoDB. 
 This would
 Allow for more flexible and scalable data modeling, especially for unstructured or semi-structured data.
 Reduce the need for complex joins in certain use cases.
 MongoDB can also integrate well with Neon for efficient cloud hosting.
-## Authentication with Auth0
+### Authentication with Auth0
 
 The current authentication mechanism could be replaced or enhanced using Auth0, which would:
 Provide a secure and scalable identity management solution.
@@ -144,13 +145,10 @@ Allow easy integration with social logins (e.g., Google, GitHub).
 Reduce the need for managing sensitive data like JWT secrets and passwords manually.
 Auth0 also supports using cookies (httpOnly and Secure cookies) for storing authentication tokens, which is a more secure approach than using local storage. This helps prevent XSS attacks and enhances security for session management.
 
-## Improved Testing Coverage
+### Improved Testing Coverage
 
-Expand test coverage for both backend and frontend to include:
-Integration tests for APIs.
-End-to-end tests for critical user workflows.
-Consider tools like Playwright or Cypress for frontend E2E tests.
-## Environment Configuration for Multiple Stages
+Expand test coverage for both backend and frontend.
+### Environment Configuration for Multiple Stages
 
 Enhance the deployment pipeline to support multiple environments (e.g., development, staging, production) with separate configurations for each environment.
 
