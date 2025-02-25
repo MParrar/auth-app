@@ -1,67 +1,85 @@
-
-import { Heading } from "../components/heading";
-import { Divider } from "../components/divider";
-import { useContext, useState } from "react";
+import { Heading } from '../components/heading';
+import { Divider } from '../components/divider';
+import { useContext, useEffect, useState } from 'react';
 import {
   PencilIcon,
   TrashIcon,
   UserPlusIcon,
   LockClosedIcon,
-} from "@heroicons/react/16/solid";
-import AuthContext from "../contexts/AuthProvider";
-import { CustomDialog } from "../components/CustomDialog";
-import { Button } from "../components/button";
-import { NewUserForm } from "../components/NewUserForm";
-import { RemoveUserConfirmation } from "../components/RemoveUserConfirmation";
-import { ChangePasswordForm } from "../components/ChangePasswordForm";
-import { EditProfileForm } from "../components/EditProfileForm";
-import { validateEditProfileForm, validateNewPasswordForm, validateNewUserForm } from "../utils/validations";
-import PaginatedTable from "../components/PaginatedTable";
-
-const initialPassword = {
-  password: "",
-  confirmPassword: "",
-};
+} from '@heroicons/react/16/solid';
+import AuthContext from '../contexts/AuthProvider';
+import { CustomDialog } from '../components/CustomDialog';
+import { Button } from '../components/button';
+import { NewUserForm } from '../components/NewUserForm';
+import { RemoveUserConfirmation } from '../components/RemoveUserConfirmation';
+import { ChangePasswordConfirmation } from '../components/ChangePasswordConfirmation';
+import { EditProfileForm } from '../components/EditProfileForm';
+import {
+  validateEditProfileForm,
+  validateNewUserForm,
+} from '../utils/validations';
+import PaginatedTable from '../components/PaginatedTable';
+import {
+  createUser,
+  getUserList,
+  removeUser,
+  sendEmailToChangePassword,
+  updateUser,
+} from '../services/userServices';
+import { useNotification } from '../contexts/NotificationProvider';
+import useAxios from '../hook/axiosInstance';
+import { Loading } from '../components/Loading';
 
 const initialNewUserForm = {
-  name: "",
-  email: "",
-  password: "",
-  confirmPassword: "",
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
 };
 
 export const UserList = () => {
-  const {
-    users,
-    updateUser,
-    changePassword,
-    removeUser,
-    createUser,
-  } = useContext(AuthContext);
+  const { user, users, setUsers } = useContext(AuthContext);
+
+  const [isLoadingComponent, setIsLoadingComponent] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialogDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [userSelected, setUserSelected] = useState({});
-  const [newPassword, setNewPassword] = useState(initialPassword);
   const [form, setForm] = useState(initialNewUserForm);
-  const [error, setError] = useState("");
-  const [newPasswordError, setNewPasswordError] = useState("");
-  const [editProfileError, setEditProfileError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [error, setError] = useState('');
+  const [editProfileError, setEditProfileError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [showChangePasswordDialog, setShowChangePasswordDialog] =
     useState(false);
 
   const isFormInvalid =
-    Object.values(error).some((err) => err !== "") ||
-    Object.values(form).some((value) => value.trim() === "");
-
-  const isNewPasswordFormValid =
-    Object.values(newPasswordError).some((err) => err !== "") ||
-    Object.values(newPassword).some((value) => value.trim() === "");
+    Object.values(error).some((err) => err !== '') ||
+    Object.values(form).some((value) => value.trim() === '');
 
   const isEditFormValid = Object.values(editProfileError).some(
-    (err) => err !== ""
+    (err) => err !== ''
   );
+  const showNotification = useNotification();
+
+
+  const axiosInstance = useAxios();
+
+  const fetchUser = async () => {
+    setIsLoadingComponent(true);
+    const response = await getUserList(
+      axiosInstance,
+      setIsLoadingComponent,
+      setUsers,
+      showNotification
+    );
+
+    setUsers(response);
+    setIsLoadingComponent(false);
+  };
+
+  useEffect(() => {
+    fetchUser();
+  }, []);
 
   const openEditDialog = (user) => {
     setUserSelected(user);
@@ -70,8 +88,6 @@ export const UserList = () => {
 
   const closeChangePasswordDialog = () => {
     setUserSelected({});
-    setNewPassword(initialPassword);
-    setNewPasswordError("");
     setShowChangePasswordDialog(false);
   };
 
@@ -97,13 +113,6 @@ export const UserList = () => {
     validateNewUserForm({ ...form, [name]: value }, setError, error);
   };
 
-  const handleChangeNewPassword = (e) => {
-    const { name, value } = e.target;
-    setNewPassword({ ...newPassword, [name]: value });
-
-    validateNewPasswordForm({ ...newPassword, [name]: value }, setNewPasswordError, newPasswordError);
-  };
-
   const handleChangeEditProfile = (e) => {
     const { name, value } = e.target;
     setUserSelected({ ...userSelected, [name]: value });
@@ -112,31 +121,56 @@ export const UserList = () => {
   };
 
   const updatePassword = () => {
-    if (newPassword?.password !== newPassword?.confirmPassword) {
-      return;
+    try {
+      sendEmailToChangePassword(userSelected?.email);
+      showNotification('success', `Email set to user ${userSelected?.email}`);
+    } catch (error) {
+      showNotification(
+        'error',
+        error?.message || 'An error occurred. Please try again later'
+      );
     }
-    changePassword(userSelected?.id, { password: newPassword?.password });
     closeChangePasswordDialog();
   };
 
-  const addUser = () => {
-    createUser({
-      name: form.name,
-      email: form.email,
-      password: form.password,
-      role: "user",
-    });
+  const addUser = async () => {
+    await createUser(
+      {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: 'user',
+      },
+      users,
+      axiosInstance,
+      setIsLoadingComponent,
+      setUsers,
+      showNotification
+    );
     closeAddUserDialog();
   };
 
   const closeEditDialog = () => {
     setShowEditDialog(false);
     setUserSelected({});
-    setEditProfileError("");
+    setEditProfileError('');
   };
 
-  const editUserInformation = () => {
-    updateUser(userSelected?.id, userSelected);
+  const editUserInformation = async () => {
+    const response = await updateUser(
+      axiosInstance,
+      userSelected?.id,
+      userSelected,
+      showNotification,
+      setIsLoadingComponent
+    );
+    if (response?.status === 'success') {
+      setUsers((prevUsers) =>
+        prevUsers?.map((user) =>
+          user.id === userSelected?.id ? { ...user, ...userSelected } : user
+        )
+      );
+    }
     closeEditDialog();
   };
 
@@ -150,8 +184,18 @@ export const UserList = () => {
     setError({});
   };
 
-  const removeAccount = () => {
-    removeUser(userSelected.id);
+  const removeAccount = async () => {
+    const response = await removeUser(
+      axiosInstance,
+      userSelected,
+      showNotification,
+      setIsLoadingComponent
+    );
+    if(response?.status === 'success'){
+      setUsers((prevUsers) =>
+        prevUsers.filter((user) => user.id !== userSelected?.id)
+      );
+    }
     closeRemoveDialog();
   };
 
@@ -159,7 +203,7 @@ export const UserList = () => {
     setSearchTerm(event.target.value);
   };
 
-  const filteredUsers = users.filter(
+  const filteredUsers = users?.filter(
     (user) =>
       user?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -167,36 +211,51 @@ export const UserList = () => {
   );
 
   const actions = (user) => {
+    const canUserUpdateInfo = user?.sub?.startsWith('auth0|');
+
     return (
-      <div className="flex gap-2">
-        <Button onClick={() => openEditDialog(user)}>
-          <PencilIcon className="h-5 w-5" />
+      <div className='flex gap-2'>
+        <Button
+          disabled={!canUserUpdateInfo}
+          onClick={() => openEditDialog(user)}
+        >
+          <PencilIcon className='h-5 w-5' />
         </Button>
         <Button onClick={() => openRemoveDialog(user)}>
-          <TrashIcon className="h-5 w-5" />
+          <TrashIcon className='h-5 w-5' />
         </Button>
-        <Button onClick={() => openChangePasswordDialog(user)}>
-          <LockClosedIcon className="h-5 w-5" />
+        <Button
+          disabled={!canUserUpdateInfo}
+          onClick={() => openChangePasswordDialog(user)}
+        >
+          <LockClosedIcon className='h-5 w-5' />
         </Button>
       </div>
     );
   };
 
-  return (
+  return isLoadingComponent ? (
+    <div
+      style={{ height: '80vh', overflow: 'hidden' }}
+      className='overflow-y-hidden'
+    >
+      <Loading />
+    </div>
+  ) : (
     <>
-      <div className="flex w-full flex-wrap items-end justify-between border-zinc-950/10 pb-6 dark:border-white/10">
-        <Heading>User List</Heading>
-        <div className="flex gap-4">
+      <div className='flex w-full flex-wrap items-end justify-between border-zinc-950/10 pb-6 dark:border-white/10'>
+        <Heading>User List - {user?.company_name} </Heading>
+        <div className='flex gap-4'>
           <input
-            type="text"
-            placeholder="Search..."
+            type='text'
+            placeholder='Search...'
             value={searchTerm}
             onChange={handleSearchChange}
-            className="px-2 py-1 border rounded-md"
+            className='px-2 py-1 border rounded-md'
           />
           <Button
             onClick={() => openAddUserDialog()}
-            className="ml-5 cursor-pointer"
+            className='ml-5 cursor-pointer'
           >
             <UserPlusIcon />
           </Button>
@@ -205,12 +264,12 @@ export const UserList = () => {
       <Divider />
       <PaginatedTable
         data={filteredUsers}
-        headers={["Email", "Name", "Role"]}
+        headers={['Email', 'Name', 'Role']}
         actions={actions}
         rowsPerPage={5}
       />
       <CustomDialog
-        title={"Edit Account"}
+        title={'Edit Account'}
         body={
           <EditProfileForm
             userInformation={userSelected}
@@ -221,30 +280,22 @@ export const UserList = () => {
         showDialog={showEditDialog}
         closeDialog={closeEditDialog}
         successAction={() => editUserInformation()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Save Changes"}
+        titleButtonClose={'Close'}
+        titleButtonSuccess={'Save Changes'}
         disabled={isEditFormValid}
       />
 
       <CustomDialog
-        title={"Change Password"}
-        body={
-          <ChangePasswordForm
-            newPassword={newPassword}
-            setNewPassword={setNewPassword}
-            handleChangeNewPassword={handleChangeNewPassword}
-            error={newPasswordError}
-          />
-        }
+        title={'Change Password'}
+        body={<ChangePasswordConfirmation />}
         showDialog={showChangePasswordDialog}
         closeDialog={closeChangePasswordDialog}
         successAction={() => updatePassword()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Save Changes"}
-        disabled={isNewPasswordFormValid}
+        titleButtonClose={'Close'}
+        titleButtonSuccess={'Save Changes'}
       />
       <CustomDialog
-        title={"Create User"}
+        title={'Create User'}
         body={
           <NewUserForm
             form={form}
@@ -256,18 +307,18 @@ export const UserList = () => {
         showDialog={showCreateDialog}
         closeDialog={closeAddUserDialog}
         successAction={() => addUser()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Save Changes"}
+        titleButtonClose={'Close'}
+        titleButtonSuccess={'Save Changes'}
         disabled={isFormInvalid}
       />
       <CustomDialog
-        title={"Delete Account"}
+        title={'Delete Account'}
         body={<RemoveUserConfirmation />}
         showDialog={showRemoveDialog}
         closeDialog={closeRemoveDialog}
         successAction={() => removeAccount()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Delete Account"}
+        titleButtonClose={'Close'}
+        titleButtonSuccess={'Delete Account'}
       />
     </>
   );

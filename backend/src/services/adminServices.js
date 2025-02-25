@@ -2,15 +2,17 @@ const pool = require('../config/db');
 
 const createAuditLog = async (req, oldData) => {
   const user = req.user;
+  const organizationId = req.organization.id;
 
   const logData = {
-    userId: user.userId,
+    userId: user.id,
     action: `${req.method} ${req.originalUrl}`,
     url: req.originalUrl,
     method: req.method,
     newData: req.body,
     oldData,
     timestamp: new Date(),
+    organizationId,
   };
 
   await saveAuditLog(logData);
@@ -18,8 +20,8 @@ const createAuditLog = async (req, oldData) => {
 
 const saveAuditLog = async (logData) => {
   const query = `
-      INSERT INTO audit_logs (user_id, action, url, method, new_data, old_data, timestamp)
-      VALUES ($1, $2, $3, $4, $5, $6, $7);
+      INSERT INTO audit_logs (user_id, action, url, method, new_data, old_data, timestamp, organization_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
     `;
 
   const values = [
@@ -30,6 +32,7 @@ const saveAuditLog = async (logData) => {
     logData.newData ? JSON.stringify(logData.newData) : null,
     logData.oldData ? JSON.stringify(logData.oldData) : null,
     logData.timestamp,
+    logData.organizationId,
   ];
 
   try {
@@ -39,19 +42,30 @@ const saveAuditLog = async (logData) => {
   }
 };
 
-const getAuditLogs = async () => {
+const getAuditLogs = async (organization_id) => {
   const logs = await pool.query(
-    `SELECT public.audit_logs.id, name, action, old_data, new_data, timestamp FROM public.audit_logs
-      inner join public.user on public.user.id = public.audit_logs.user_id`
+    `
+    SELECT public.audit_logs.id, name, action, old_data, new_data, timestamp
+    FROM public.audit_logs
+    INNER JOIN public.users on public.users.id = public.audit_logs.user_id
+    WHERE public.audit_logs.organization_id = $1
+      `,
+    [organization_id]
   );
   return logs;
 };
 
-const getUsers = async () => {
+const getUsers = async (organization_id) => {
   const users = await pool.query(
-    'SELECT id, name, email, role FROM public.user order by id'
+    `SELECT u.id, u.sub, u.name, u.email, uo.role, org.name as company_name
+    FROM public.users as u
+    inner join public.user_organizations as uo on u.id = uo.user_id
+    inner join public.organizations as org on org.id = uo.organization_id
+    where org.id = $1
+    `,
+    [organization_id]
   );
   return users.rows;
 };
 
-module.exports = { createAuditLog, getAuditLogs, getUsers};
+module.exports = { createAuditLog, getAuditLogs, getUsers };

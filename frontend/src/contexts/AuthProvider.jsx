@@ -1,208 +1,94 @@
-import axios from "axios";
-import { createContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { useNotification } from "./NotificationProvider";
-import { isTokenValid } from "../utils/validations";
+import { createContext, useEffect, useState } from 'react';
+import { useNotification } from './NotificationProvider';
+import useAxios from '../hook/axiosInstance';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children, initialUser = {} }) => {
   const [user, setUser] = useState(initialUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    JSON.parse(localStorage.getItem('isAuthenticated')) || false
+  );
   const [users, setUsers] = useState([]);
-  const [token, setToken] = useState(localStorage.getItem("token"));
-  const [isLoading, setIsLoading] = useState(true);
-
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const axiosInstance = useAxios();
   const showNotification = useNotification();
 
-  const getUserProfile = () => {
-    setIsLoading(true);
-    axios.defaults.headers["Authorization"] = `Bearer ${token}`;
-    axios
-      .get(`${import.meta.env.VITE_BASE_URL}/users/profile`)
-      .then((res) => {
-        if (res.data.status === "success") {
-          setUser(res.data.user);
-        }
-      })
-      .catch((err) => {
-        showNotification("error", err.response?.data?.message);
-        handleExpiredSession(err.response?.data?.message);
-      })
-      .finally(() => setIsLoading(false));
-  };
-
-  useEffect(() => {
-    if (token) {
-      if (isTokenValid(token)) {
-        getUserProfile();
-      } else {
-        showNotification(
-          "error",
-          "Your session has expired. Please log in again."
-        );
-        logout();
-      }
-    }
-  }, [token]);
-
-  useEffect(() => {
-    getUserList()
-  },[user]);
-
-  const updateUserContext = (id, updatedData) => {
-    if (user?.id === id) {
-      setUser((prevUser) => ({
-        ...prevUser,
-        ...updatedData,
-      }));
-    }
-  };
-
-  const getUserList = () => {
-    if (user?.role === "admin") {
-      if (!isTokenValid(token)) {
-        showNotification(
-          "error",
-          "Your session has expired. Please log in again."
-        );
-        logout();
-        return;
-      }
+  const authenticateUser = async () => {
+    try {
       setIsLoading(true);
-      axios
-        .get(`${import.meta.env.VITE_BASE_URL}/admin/list`)
-        .then((res) => setUsers(res.data))
-        .catch((err) => {
-          showNotification("error", err.response?.data?.message);
-          handleExpiredSession(err.response?.data?.message);
-        })
-        .finally(() => setIsLoading(false));
-    }
-  };
-
-  const login = (userToken) => {
-    setIsLoading(true);
-    localStorage.setItem("token", userToken);
-    setToken(userToken);
-    setIsLoading(false);
-  };
-
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
-    setUsers([]);
-    navigate("/login");
-  };
-
-  const handleExpiredSession = (errorMessage) => {
-    errorMessage === "Invalid or expired session" && logout()
-  }
-
-  const updateUser = (id, updatedData) => {
-    if (!isTokenValid(token)) {
-      showNotification(
-        "error",
-        "Your session has expired. Please log in again."
+      const response = await axiosInstance.get(
+        'http://localhost:5000/api/user',
+        { withCredentials: true }
       );
-      logout();
-      return;
-    }
-    setIsLoading(true);
-    axios.defaults.headers["Authorization"] = `Bearer ${localStorage.getItem(
-      "token"
-    )}`;
-    axios
-      .put(`${import.meta.env.VITE_BASE_URL}/users/${id}`, updatedData)
-      .then((res) => {
-        if (res.data.status === "success") {
-          setUsers((prevUsers) =>
-            prevUsers.map((user) =>
-              user.id === id ? { ...user, ...updatedData } : user
-            )
-          );
-          showNotification("success", res.data.message);
-          updateUserContext(id, updatedData);
-        }
-      })
-      .catch((err) => {
-        showNotification("error", err.response?.data?.message);
-        handleExpiredSession(err.response?.data?.message);
-      })
-      .finally(() => setIsLoading(false));
-  };
 
-  const createUser = (newUser) => {
-    setIsLoading(true);
-    axios
-      .post(`${import.meta.env.VITE_BASE_URL}/users/register`, newUser)
-      .then((res) => {
-        setUsers([...users, res.user]);
-        showNotification("success", "User Created Successfully");
-        getUserList()
-      })
-      .catch((err) => {
-        showNotification("error", err.response?.data?.message);
-        handleExpiredSession(err.response?.data?.message);
-      })
-      .finally(() => setIsLoading(false));
-  };
-
-  const changePassword = (id, password) => {
-    if (!isTokenValid(token)) {
+      if (response.data.isAuthenticated) {
+        setIsAuthenticated(true);
+        localStorage.setItem('isAuthenticated', true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch (err) {
+      setIsAuthenticated(false);
       showNotification(
-        "error",
-        "Your session has expired. Please log in again."
+        'error',
+        err?.response.data.message ||
+          'An error occurred. Please try again later'
       );
-      logout();
-      return;
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(true);
-    axios.defaults.headers["Authorization"] = `Bearer ${localStorage.getItem(
-      "token"
-    )}`;
-    axios
-      .put(
-        `${import.meta.env.VITE_BASE_URL}/users/change-password/${id}`,
-        password
-      )
-      .then((res) => {
-        if (res.data.status === "success") {
-          showNotification("success", res.data.message);
-        }
-      })
-      .catch((err) => {
-        showNotification("error", err.response?.data?.message);
-        handleExpiredSession(err.response?.data?.message);
-      })
-      .finally(() => setIsLoading(false));
   };
 
-  const removeUser = (id) => {
-    if (!isTokenValid(token)) {
-      showNotification(
-        "error",
-        "Your session has expired. Please log in again."
+  useEffect(() => {
+    authenticateUser();
+  }, []);
+
+  const loginUser = async () => {
+    try {
+      setIsLoading(true);
+      const response = await axiosInstance.post(
+        'http://localhost:5000/api/login',
+        { withCredentials: true }
       );
-      logout();
-      return;
+
+      if (response.data.status === 'success') {
+        setUser(response.data.user);
+      }
+    } catch (err) {
+      showNotification(
+        'error',
+        err?.response.data.message ||
+          'An error occurred. Please try again later'
+      );
+      logoutUser();
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(true);
-    axios.defaults.headers["Authorization"] = `Bearer ${localStorage.getItem(
-      "token"
-    )}`;
-    axios
-      .delete(`${import.meta.env.VITE_BASE_URL}/users/${id}`)
-      .then(() => {
-        setUsers((prevUsers) => prevUsers.filter((user) => user.id !== id));
-        showNotification("success", "User has been successfully removed");
-      })
-      .catch((err) => {
-        showNotification("error", err.response?.data?.message);
-        handleExpiredSession(err.response?.data?.message);
-      })
-      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loginUser();
+    }
+  }, [isAuthenticated]);
+
+  const getSubdomain = () => {
+    const hostname = window.location.hostname;
+    const hostnameSplitted = hostname.split('.');
+    if (hostnameSplitted.length > 1) {
+      return hostname.split('.')[0];
+    }
+    return '';
+  };
+
+  const showAuth0Login = () => {
+    window.location.href = `${import.meta.env.VITE_BASE_API_URL}/login?subdomain=${getSubdomain()}`;
+  };
+
+  const logoutUser = () => {
+    localStorage.removeItem('isAuthenticated');
+    window.location.href = `${import.meta.env.VITE_BASE_API_URL}/api/logout`;
   };
 
   return (
@@ -210,16 +96,14 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
       value={{
         user,
         users,
-        token,
+        isAuthenticated,
         isLoading,
-        login,
-        logout,
-        updateUser,
-        removeUser,
-        changePassword,
-        createUser,
-        getUserProfile,
-        getUserList,
+        setUser,
+        setUsers,
+        setIsLoading,
+        authenticateUser,
+        logoutUser,
+        showAuth0Login,
       }}
     >
       {children}

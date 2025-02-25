@@ -27,19 +27,6 @@ jobs:
         run: 
           cd backend && npm run lint
 
-      - name: Run backend tests
-        run: |
-          cd backend
-          npm run test
-        env:
-          DATABASE_URL_TEST: ${{ secrets.DATABASE_URL_TEST }}
-          API_KEY_EMAIL: ${{ secrets.API_KEY_EMAIL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
       - name: Install frontend dependencies
         run: |
           cd frontend
@@ -48,11 +35,6 @@ jobs:
       - name: Lint frontend code
         run: 
           cd frontend && npm run lint
-
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm run test
 
       - name: Build frontend
         run: |

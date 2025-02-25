@@ -1,12 +1,19 @@
 const express = require('express');
-const { registerUser, getProfile, updateProfile, archiveProfile, changePassword } = require('../controllers/userController');
-const { verifyToken } = require('../middlewares/authMiddleware');
+const {
+  getProfile,
+  updateProfile,
+  archiveProfile,
+} = require('../controllers/userController');
+const {
+  verifyToken,
+  validateUserOrganization,
+} = require('../middlewares/authMiddleware');
 const router = express.Router();
 
-router.post('/register', registerUser);
-router.get('/profile', verifyToken, getProfile);
-router.delete('/:id', verifyToken, archiveProfile);
-router.put('/:id', verifyToken, updateProfile);
-router.put('/change-password/:id', verifyToken, changePassword);
+
+router.get('/profile', [verifyToken, validateUserOrganization], getProfile);
+router.delete('/:id', [verifyToken, validateUserOrganization], archiveProfile);
+router.put('/:id', [verifyToken, validateUserOrganization], updateProfile);
+
 
 module.exports = router;

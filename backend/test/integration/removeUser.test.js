@@ -7,9 +7,9 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
     req.cookies = req.cookies || {};
     req.cookies.access_token = 'mockedAccessToken';
     req.userLogin = {
-      sub: 'auth0|mockUserId',
+      sub: 'auth0|mockUserIdRemove',
       [`${process.env.AUTH0_NAME_SPACE}/subdomain`]: 'org',
-      [`${process.env.AUTH0_NAME_SPACE}/email`]: 'get@example.com',
+      [`${process.env.AUTH0_NAME_SPACE}/email`]: 'user_remove@email.com',
     };
     next();
   }),
@@ -18,9 +18,9 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
     req.organization = { id: null, name: 'My Org', subdomain: 'org' };
     req.user = {
       id: 1,
-      sub: 'auth0|mockUserId',
+      sub: 'auth0|mockUserIdRemove',
       name: 'Jane Doe',
-      email: 'get@example.com',
+      email: 'user_remove@email.com',
       role: 'user',
     };
     next();
@@ -63,10 +63,18 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
   },
 }));
 
+jest.mock('../../src/services/auth0Services', () => ({
+  auth0: {
+    users: {
+      delete: jest.fn().mockResolvedValue({}),
+    },
+  },
+}));
+
 const userData = {
-  email: 'get@example.com',
+  email: 'user_remove@email.com',
   name: 'Jane Doe',
-  sub: 'auth0|mockUserId',
+  sub: 'auth0|mockUserIdRemove',
 };
 
 const organizationData = {
@@ -74,7 +82,7 @@ const organizationData = {
   subdomain: 'org',
 };
 
-describe('GET /api/users/profile', () => {
+describe('DELETE /api/users/:id', () => {
   let userId;
   let organization_id;
 
@@ -125,7 +133,6 @@ describe('GET /api/users/profile', () => {
   });
 
   afterAll(async () => {
-    await pool.query('DELETE FROM public.users WHERE id = $1;', [userId]);
     await pool.query(
       'DELETE FROM public.user_organizations WHERE user_id = $1;',
       [userId]
@@ -136,21 +143,14 @@ describe('GET /api/users/profile', () => {
     await pool.end();
   });
 
-  describe('Get User Profile', () => {
-    it('Should return a 200 and the user info', async () => {
-      const { statusCode, body } = await supertest(app).get(
-        '/api/users/profile'
-      );
+  describe('Remove user', () => {
+    it('Should return a 200 and remove user', async () => {
+      const { statusCode, body } = await supertest(app)
+        .delete(`/api/users/${userId}`)
+        .query({ user: userData });
       expect(statusCode).toBe(200);
       expect(body.status).toEqual('success');
-      expect(body.user).toEqual({
-        id: userId,
-        sub: userData.sub,
-        name: userData.name,
-        email: userData.email,
-        role: 'user',
-        company_name: organizationData.name,
-      });
+      expect(body.message).toEqual('User removed');
     });
   });
 });

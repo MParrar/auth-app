@@ -1,101 +1,33 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Login } from "../pages/Login";
-import { BrowserRouter } from "react-router";
-import { AuthProvider } from "../contexts/AuthProvider";
-import axios from "axios";
-import { NotificationProvider } from "../contexts/NotificationProvider";
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import AuthContext from '../contexts/AuthProvider';
+import { LandingPage } from '../pages/LandingPage';
 
-describe("Login", () => {
-
-  beforeEach(() => {
+describe('LandingPage', () => {
+  it('renders the landing page correctly', () => {
     render(
-      <BrowserRouter>
-        <NotificationProvider>
-          <AuthProvider>
-            <Login />
-          </AuthProvider>
-        </NotificationProvider>
-      </BrowserRouter>
+      <AuthContext.Provider value={{ showAuth0Login: vi.fn() }}>
+        <LandingPage />
+      </AuthContext.Provider>
     );
+
+    expect(screen.getByText('Base Auth')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Get Started' })).toBeInTheDocument();
   });
 
-  it("Structure component", () => {
-    const h2 = screen.getByRole("heading", { level: 2 });
-    const emailInput = screen.getByText("Email");
-    const passwordInput = screen.getByText("Password");
+  it('calls showAuth0Login when the button is clicked', () => {
+    const showAuth0Login = vi.fn();
 
-    expect(h2).toBeInTheDocument();
-    expect(h2.textContent).toBe("Sign in to your account");
-    expect(emailInput.textContent).toBe("Email");
-    expect(passwordInput.textContent).toBe("Password");
+    render(
+      <AuthContext.Provider value={{ showAuth0Login }}>
+        <LandingPage />
+      </AuthContext.Provider>
+    );
+
+    const button = screen.getByRole('button', { name: 'Get Started' });
+    fireEvent.click(button);
+
+    expect(showAuth0Login).toHaveBeenCalled();
   });
-
-  it("Login Action", async () => {
-    vi.mock("axios");
-
-    vi.stubGlobal("import.meta", {
-      env: {
-        VITE_BASE_URL: "http://mocked-url.com",
-      },
-    });
-
-    axios.post.mockResolvedValueOnce({
-      data: { message: "User registered successfully" },
-    });
-
-    const userCredential = { email: "email@email.com", password: "12345678" };
-    const emailInput = screen.getByLabelText("Email");
-    const passwordInput = screen.getByLabelText("Password");
-
-    const submitButton = screen.getByRole("button", { name: "Sign In" });
-
-    fireEvent.change(emailInput, { target: { value: userCredential.email } });
-    fireEvent.change(passwordInput, {
-      target: { value: userCredential.password },
-    });
-
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(axios.post).toHaveBeenCalledWith(
-        `${import.meta.env.VITE_BASE_URL}/login`,
-        {
-          email: userCredential.email,
-          password: userCredential.password,
-        }
-      );
-    });
-  });
-
-  it("should show an error notification on failed login", async () => {
-    const userCredential = {
-      email: "email@email.com",
-      password: "Wrong Password",
-    };
-    const emailInput = screen.getByLabelText("Email");
-    const passwordInput = screen.getByLabelText("Password");
-    const submitButton = screen.getByRole("button", { name: "Sign In" });
-
-    fireEvent.change(emailInput, { target: { value: userCredential.email } });
-    fireEvent.change(passwordInput, {
-      target: { value: userCredential.password },
-    });
-
-    const signInSpy = vi.spyOn(axios, "post").mockRejectedValueOnce({
-      response: {
-        data: { message: "Invalid credentials" },
-      },
-    });
-
-    fireEvent.click(submitButton);
-
-    expect(signInSpy).toHaveBeenCalledWith(
-      `${import.meta.env.VITE_BASE_URL}/login`,
-      userCredential
-    ); 
-
-    const errorNotification = await screen.findByText("Invalid credentials");
-    expect(errorNotification).toBeInTheDocument();
-  });
+  
 });

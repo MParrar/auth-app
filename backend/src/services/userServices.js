@@ -1,92 +1,129 @@
-const bcrypt = require('bcryptjs');
-const { sendEmail } = require('./emailServices');
 const pool = require('../config/db');
 const { createAuditLog } = require('./adminServices');
+const { auth0 } = require('./auth0Services');
 
-const createUser = async (req, name, email, password, role = 'user') => {
+const createUser = async (sub, email, name, organization_id, role = 'user') => {
+  if (!name || !email || !sub) {
+    throw new Error('You need to provide name, email and sub');
+  }
+  const now = new Date();
+  try {
+    await pool.query('BEGIN');
+    let user = await findUserBySub(sub);
+    if (!user) {
+      const userResult = await pool.query(
+        'INSERT INTO public.users (email, name, sub, created_at, updated_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [email, name, sub, now, now]
+      );
+      user = userResult.rows[0];
+    }
+    await pool.query(
+      'INSERT INTO public.user_organizations (user_id, organization_id, role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)',
+      [user.id, organization_id, role, now, now]
+    );
+
+    await pool.query('COMMIT');
+    return await findUserBySubAndOrganizationId(sub, organization_id);
+  } catch (error) {
+    console.log(error);
+    await pool.query('ROLLBACK');
+  }
+};
+
+const createUserByAdmin = async (
+  req,
+  email,
+  name,
+  password,
+  organization_id,
+  role = 'user'
+) => {
   if (!name || !email || !password) {
     throw new Error('You need to provide name, email and password');
   }
+  const auth0User = await auth0.usersByEmail.getByEmail({
+    email: email,
+  });
 
-  if (password.length < 8) {
-    throw new Error('The password must contain at least 8 characters');
-  }
+  let sub;
 
-  const existingUser = await findUserByEmail(email);
-  if (existingUser.length > 0) {
-    throw new Error('User already exists');
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const newUser = await pool.query(
-    'INSERT INTO public.user (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *',
-    [name, email, hashedPassword, role]
-  );
-
-  sendEmail(
-    email,
-    'Your account has been created successfully!',
-    `
-      Hello ${name}, \n\nWe're happy to inform you that your account has been created successfully.\n\nAccess your account: ${process.env.FRONTEND_URL} \n\nBest regards`
-  );
-
-  if (role === 'admin') {
-    createAuditLog(
-      req,
-      {
-        id: newUser.rows[0].id,
-        name: newUser.rows[0].name,
-        email: newUser.rows[0].email,
-      }
+  if (auth0User.data[0]?.user_id) {
+    const userInOrganization = await findUserBySubAndOrganizationId(
+      auth0User.data[0].user_id,
+      organization_id
     );
-  }
-
-  return newUser.rows[0];
-};
-
-const getUserProfileById = async (userId) => {
-  try {
-    const user = await pool.query(
-      'SELECT id, name, email, role FROM public.user WHERE id = $1',
-      [userId]
-    );
-
-    if (user.rows.length === 0) {
-      throw new Error('User not found');
+    if (userInOrganization) {
+      throw new Error('User already exists');
     }
-
-    return user.rows[0];
-  } catch (error) {
-    throw new Error(error.message || 'Server error');
+    sub = auth0User.data[0].user_id;
+  } else {
+    const newAuth0User = await auth0.users.create({
+      connection: 'Username-Password-Authentication',
+      email,
+      password,
+      name,
+    });
+    sub = newAuth0User.data.user_id;
   }
+
+  const newUser = createUser(sub, email, name, organization_id, role);
+
+  createAuditLog(req, {
+    id: newUser.id,
+    name: newUser.name,
+    email: newUser.email,
+  });
+
+  return newUser;
 };
 
-const updateUserProfile = async (req, id, name, email, currentUser) => {
-
-  if(!id || !name || !email){
+const updateUserProfile = async (
+  req,
+  id,
+  name,
+  email,
+  currentUser,
+  sub,
+  organization_id
+) => {
+  if (!id || !name || !email) {
     throw new Error('You need to provide id, email and name');
   }
 
-  const user = await pool.query('SELECT * FROM public.user WHERE id = $1', [
-    id,
+  const user = await pool.query('SELECT * FROM public.users WHERE sub = $1', [
+    sub,
   ]);
 
+  const existingUser = await findUserBySub(sub);
   if (
+    !existingUser ||
     user.rows.length === 0 ||
     (currentUser.role !== 'admin' && user.rows[0].id != id)
   ) {
     throw new Error('User not found');
   }
+  const auth0User = await auth0.usersByEmail.getByEmail({
+    email: email,
+  });
 
-  const existingUser = await findUserByEmail(email);
-  if (existingUser.length > 0 && existingUser[0].id != id) {
+  if (
+    auth0User.data[0]?.email == email &&
+    existingUser.sub != auth0User.data[0].user_id
+  ) {
     throw new Error('User already exists');
   }
 
   await pool.query(
-    'UPDATE public.user SET name = $1, email = $2 WHERE id = $3',
-    [name, email, id]
+    'UPDATE public.users SET name = $1, email = $2 WHERE sub = $3',
+    [name, email, sub]
+  );
+
+  auth0.users.update(
+    { id: sub },
+    {
+      name: name,
+      email: email,
+    }
   );
 
   if (currentUser.role === 'admin') {
@@ -97,68 +134,65 @@ const updateUserProfile = async (req, id, name, email, currentUser) => {
     });
   }
 
-  return user.rows[0];
+  const userUpdated = await findUserBySubAndOrganizationId(
+    sub,
+    organization_id
+  );
+  return userUpdated;
 };
 
-const changeUserPassword = async (req, id, newPassword, currentUser) => {
-  const user = await pool.query('SELECT * FROM public.user WHERE id = $1', [
-    id,
-  ]);
-
-  if (
-    (currentUser !== 'admin' && user.rows[0].id != id) ||
-    user.rows.length === 0
-  ) {
-    throw new Error('User not found');
+const removeUser = async (req, sub, currentUser) => {
+  if (!sub) {
+    throw new Error('Provide sub');
   }
 
-  const updatedPassword = newPassword
-    ? await bcrypt.hash(newPassword, 10)
-    : user.rows[0].newPassword;
+  await pool.query('DELETE from public.users WHERE sub = $1', [sub]);
 
-  await pool.query('UPDATE public.user SET password = $1 WHERE id = $2', [
-    updatedPassword,
-    id,
-  ]);
+  await auth0.users.delete({
+    id: sub,
+  });
 
-  if (currentUser === 'admin') {
-    createAuditLog(req, '');
+  if (currentUser.role === 'admin') {
+    createAuditLog(req, {});
   }
 };
 
-const removeUser = async (req, id) => {
-  const user = await pool.query('SELECT * FROM public.user WHERE id = $1', [
-    id,
+const updateUserSession = async (session, expirationTime) => {
+  await pool.query('UPDATE public.users SET session = $1  WHERE sub = $2', [
+    expirationTime,
+    session,
   ]);
-
-  if (user.rows.length === 0) {
-    throw new Error('User not found');
-  }
-
-  await pool.query('DELETE FROM public.user WHERE id = $1', [id]);
-
-  if (req.user.role === 'admin') {
-    createAuditLog(req, {
-      id: user.rows[0].id,
-      name: user.rows[0].name,
-      email: user.rows[0].email,
-    });
-  }
 };
 
-const findUserByEmail = async (email) => {
+const findUserBySub = async (sub) => {
   const existingUser = await pool.query(
-    'SELECT * FROM public.user WHERE email = $1',
-    [email]
+    'SELECT * FROM public.users WHERE sub = $1',
+    [sub]
   );
 
-  return existingUser.rows;
+  return existingUser.rows[0];
+};
+
+const findUserBySubAndOrganizationId = async (sub, organization_id) => {
+  const existingUser = await pool.query(
+    `SELECT u.id, u.sub, u.name, u.email, uo.role, org.name as company_name
+    FROM public.users as u
+    inner join public.user_organizations as uo on u.id = uo.user_id
+    inner join public.organizations as org on org.id = uo.organization_id
+    WHERE u.sub = $1
+    and org.id = $2`,
+    [sub, organization_id]
+  );
+
+  return existingUser.rows[0];
 };
 
 module.exports = {
-  getUserProfileById,
   updateUserProfile,
   createUser,
-  changeUserPassword,
-  removeUser
+  removeUser,
+  updateUserSession,
+  findUserBySub,
+  createUserByAdmin,
+  findUserBySubAndOrganizationId,
 };

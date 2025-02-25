@@ -1,60 +1,68 @@
-import React, { useContext, useEffect, useState } from "react";
-import { Heading } from "../components/heading";
+import React, { useContext, useEffect, useState } from 'react';
+import { Heading } from '../components/heading';
 import {
   DescriptionDetails,
   DescriptionList,
   DescriptionTerm,
-} from "../components/description-list";
-import { Divider } from "../components/divider";
-import { Button } from "../components/button";
-import { CustomDialog } from "../components/CustomDialog";
-import AuthContext from "../contexts/AuthProvider";
+} from '../components/description-list';
+import { Divider } from '../components/divider';
+import { Button } from '../components/button';
+import { CustomDialog } from '../components/CustomDialog';
+import AuthContext from '../contexts/AuthProvider';
 
 import {
   PencilIcon,
   TrashIcon,
   LockClosedIcon,
-} from "@heroicons/react/24/solid";
-import { RemoveUserConfirmation } from "../components/RemoveUserConfirmation";
-import { Loading } from "../components/Loading";
-import { ChangePasswordForm } from "../components/ChangePasswordForm";
-import { EditProfileForm } from "../components/EditProfileForm";
-import { validateEditProfileForm, validateNewPasswordForm } from "../utils/validations";
-
-const initialPassword = {
-  password: "",
-  confirmPassword: "",
-};
+} from '@heroicons/react/24/solid';
+import { RemoveUserConfirmation } from '../components/RemoveUserConfirmation';
+import { Loading } from '../components/Loading';
+import { ChangePasswordConfirmation } from '../components/ChangePasswordConfirmation';
+import { EditProfileForm } from '../components/EditProfileForm';
+import { validateEditProfileForm } from '../utils/validations';
+import {
+  getUserProfile,
+  removeUser,
+  sendEmailToChangePassword,
+  updateUser,
+} from '../services/userServices';
+import useAxios from '../hook/axiosInstance';
+import { useNotification } from '../contexts/NotificationProvider';
 
 export const MyProfile = () => {
-  const { user, updateUser, changePassword, removeUser, logout, isLoading } =
-    useContext(AuthContext);
+  const { user, logoutUser, setUser } = useContext(AuthContext);
+
+  const showNotification = useNotification();
+  const axiosInstance = useAxios();
+
   const [showRemoveDialog, setShowRemoveDialogDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [isLoadingComponent, setIsLoadingComponent] = useState(false);
   const [showChangePasswordDialog, setShowChangePasswordDialog] =
     useState(false);
   const [userInformation, setUserInformation] = useState({
-    email: "",
-    name: "",
+    email: '',
+    name: '',
   });
-  const [newPassword, setNewPassword] = useState(initialPassword);
-  const [newPasswordError, setNewPasswordError] = useState("");
-  const [editProfileError, setEditProfileError] = useState("");
-
-  const isNewPasswordFormValid =
-    Object.values(newPasswordError).some((err) => err !== "") ||
-    Object.values(newPassword).some((value) => value.trim() === "");
+  const [editProfileError, setEditProfileError] = useState('');
 
   const isEditFormValid = Object.values(editProfileError).some(
-    (err) => err !== ""
+    (err) => err !== ''
   );
+  const canUserUpdateInfo = user?.sub?.startsWith('auth0|');
 
-  const handleChangeNewPassword = (e) => {
-    const { name, value } = e.target;
-    setNewPassword({ ...newPassword, [name]: value });
-
-    validateNewPasswordForm({ ...newPassword, [name]: value }, setNewPasswordError, newPasswordError);
-  };
+  useEffect(() => {
+    const fetchUser = async () => {
+      setIsLoadingComponent(true);
+      const response = await getUserProfile(axiosInstance, showNotification);
+      if (response?.status === 'success') {
+        setUser(response.user);
+      }
+      setIsLoadingComponent(false);
+      return response;
+    };
+    fetchUser();
+  }, []);
 
   const handleChangeEditProfile = (e) => {
     const { name, value } = e.target;
@@ -66,8 +74,12 @@ export const MyProfile = () => {
   useEffect(() => {
     if (showEditDialog && user) {
       setUserInformation({
+        id: user?.id,
         email: user?.email,
         name: user?.name,
+        sub: user?.sub,
+        role: user?.role,
+        company_name: user?.company_name,
       });
     }
   }, [showEditDialog, user]);
@@ -78,8 +90,6 @@ export const MyProfile = () => {
 
   const closeChangePasswordDialog = () => {
     setShowChangePasswordDialog(false);
-    setNewPassword(initialPassword);
-    setNewPasswordError("");
   };
 
   const openChangePasswordDialog = () => {
@@ -96,113 +106,138 @@ export const MyProfile = () => {
 
   const closeEditDialog = () => {
     setShowEditDialog(false);
-    setEditProfileError("")
+    setEditProfileError('');
   };
 
-  const editUserInformation = () => {
-    updateUser(user?.id, userInformation);
+  const editUserInformation = async () => {
+    const response = await updateUser(
+      axiosInstance,
+      user?.id,
+      userInformation,
+      showNotification,
+      setIsLoadingComponent
+    );
+    if (response?.status === 'success') {
+      setUser(userInformation);
+    }
     closeEditDialog();
   };
 
   const updatePassword = () => {
-    if (newPassword?.password !== newPassword?.confirmPassword) {
-      return;
-    }
-
-    changePassword(user?.id, { password: newPassword?.password });
+    sendEmailToChangePassword(user?.email, showNotification);
     closeChangePasswordDialog();
   };
 
-  const removeAccountAndLogout = () => {
-    removeUser(user?.id);
-    logout();
+  const removeAccountAndLogout = async () => {
+    const response = await removeUser(
+      axiosInstance,
+      user,
+      showNotification,
+      setIsLoadingComponent
+    );
+    closeRemoveDialog();
+    if (response?.status === 'success') {
+      logoutUser();
+    }
   };
 
   return (
     <>
-      <Heading data-testid="my-profile-heading">My Profile</Heading>
-      <Divider className="mt-4" />
-      <DescriptionList className="mt-10">
-        <DescriptionTerm data-testid="my-profile-email-label">
-          Email
-        </DescriptionTerm>
-        <DescriptionDetails>{user?.email}</DescriptionDetails>
+      {isLoadingComponent ? (
+        <div
+          style={{ height: '80vh', overflow: 'hidden' }}
+          className='overflow-y-hidden'
+        >
+          <Loading />
+        </div>
+      ) : (
+        <>
+          <Heading data-testid='my-profile-heading'>
+            Profile - {user?.company_name}
+          </Heading>
+          <Divider className='mt-4' />
+          <DescriptionList className='mt-10'>
+            <DescriptionTerm data-testid='my-profile-email-label'>
+              Email
+            </DescriptionTerm>
+            <DescriptionDetails>{user?.email}</DescriptionDetails>
 
-        <DescriptionTerm data-testid="my-profile-password-label">
-          Password
-        </DescriptionTerm>
-        <DescriptionDetails>******</DescriptionDetails>
+            <DescriptionTerm data-testid='my-profile-password-label'>
+              Password
+            </DescriptionTerm>
+            <DescriptionDetails>******</DescriptionDetails>
 
-        <DescriptionTerm data-testid="my-profile-name-label">
-          Name
-        </DescriptionTerm>
-        <DescriptionDetails>{user?.name}</DescriptionDetails>
-      </DescriptionList>
-      <div className="mt-1y flex gap-4">
-        <Button
-          onClick={() => openEditDialog()}
-          className=" text-white px-4 py-2 rounded focus:outline-none flex items-center cursor-pointer"
-        >
-          <PencilIcon className="h-5 w-5 mr-2" />
-          Edit
-        </Button>
-        <Button
-          onClick={() => openRemoveDialog()}
-          className="text-white px-4 py-2 rounded focus:outline-none flex items-center cursor-pointer"
-        >
-          <TrashIcon className="h-5 w-5 mr-2" />
-          Delete
-        </Button>
-        <Button
-          onClick={() => openChangePasswordDialog()}
-          className="text-white px-4 py-2 rounded focus:outline-none flex items-center cursor-pointer"
-        >
-          <LockClosedIcon className="h-5 w-5 mr-2" />
-          Change Password
-        </Button>
-      </div>
-      <CustomDialog
-        title={"Delete Account"}
-        body={<RemoveUserConfirmation />}
-        showDialog={showRemoveDialog}
-        closeDialog={closeRemoveDialog}
-        successAction={() => removeAccountAndLogout()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Delete Account"}
-      />
-      <CustomDialog
-        title={"Edit Account"}
-        body={
-          <EditProfileForm
-            userInformation={userInformation}
-            handleChangeEditProfile={handleChangeEditProfile}
-            error={editProfileError}
+            <DescriptionTerm data-testid='my-profile-name-label'>
+              Name
+            </DescriptionTerm>
+            <DescriptionDetails>{user?.name}</DescriptionDetails>
+          </DescriptionList>
+          <div className='mt-1y flex gap-4'>
+            <Button
+              data-testid='edit-profile-button'
+              onClick={() => openEditDialog()}
+              className={`text-white px-4 py-2 rounded focus:outline-none flex items-center ${
+                canUserUpdateInfo ? 'cursor-pointer' : ''
+              }`}
+              disabled={!canUserUpdateInfo}
+            >
+              <PencilIcon className='h-5 w-5 mr-2' />
+              Edit
+            </Button>
+            <Button
+              onClick={() => openRemoveDialog()}
+              className='text-white px-4 py-2 rounded focus:outline-none flex items-center cursor-pointer'
+            >
+              <TrashIcon className='h-5 w-5 mr-2' />
+              Delete
+            </Button>
+            <Button
+              onClick={() => openChangePasswordDialog()}
+              className={`text-white px-4 py-2 rounded focus:outline-none flex items-center ${
+                canUserUpdateInfo ? 'cursor-pointer' : ''
+              }`}
+              disabled={!canUserUpdateInfo}
+            >
+              <LockClosedIcon className='h-5 w-5 mr-2' />
+              Change Password
+            </Button>
+          </div>
+          <CustomDialog
+            title={'Delete Account'}
+            body={<RemoveUserConfirmation />}
+            showDialog={showRemoveDialog}
+            closeDialog={closeRemoveDialog}
+            successAction={() => removeAccountAndLogout()}
+            titleButtonClose={'Close'}
+            titleButtonSuccess={'Delete Account'}
           />
-        }
-        showDialog={showEditDialog}
-        closeDialog={closeEditDialog}
-        successAction={() => editUserInformation()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Save Changes"}
-        disabled={isEditFormValid}
-      />
-      <CustomDialog
-        title={"Change Password"}
-        body={
-          <ChangePasswordForm
-            newPassword={newPassword}
-            handleChangeNewPassword={handleChangeNewPassword}
-            error={newPasswordError}
+          <CustomDialog
+            title={'Edit Account'}
+            body={
+              <EditProfileForm
+                userInformation={userInformation}
+                handleChangeEditProfile={handleChangeEditProfile}
+                error={editProfileError}
+              />
+            }
+            showDialog={showEditDialog}
+            closeDialog={closeEditDialog}
+            successAction={() => editUserInformation()}
+            titleButtonClose={'Close'}
+            titleButtonSuccess={'Save Changes'}
+            disabled={isEditFormValid}
           />
-        }
-        showDialog={showChangePasswordDialog}
-        closeDialog={closeChangePasswordDialog}
-        successAction={() => updatePassword()}
-        titleButtonClose={"Close"}
-        titleButtonSuccess={"Save Changes"}
-        disabled={isNewPasswordFormValid}
-      />
-      {isLoading && <Loading />}
+          <CustomDialog
+            title={'Change Password'}
+            body={<ChangePasswordConfirmation />}
+            showDialog={showChangePasswordDialog}
+            closeDialog={closeChangePasswordDialog}
+            successAction={() => updatePassword()}
+            titleButtonClose={'Close'}
+            titleButtonSuccess={'Save Changes'}
+          />
+        </>
+      )}
     </>
   );
 };

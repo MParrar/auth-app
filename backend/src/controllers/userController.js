@@ -1,33 +1,42 @@
-
 const dotenv = require('dotenv');
+const fs = require('fs');
+const path = require('path');
+const csv = require('csv-parser');
+const { createObjectCsvWriter } = require('csv-writer');
+const xlsx = require('xlsx');
+const { Transform } = require('stream');
+const Papa = require('papaparse');
 
 const {
-  getUserProfileById,
   updateUserProfile,
-  createUser,
-  changeUserPassword,
+  createUserByAdmin,
   removeUser,
+  findUserBySubAndOrganizationId,
 } = require('../services/userServices');
 
 dotenv.config();
 
 const registerUser = async (req, res) => {
-  const { name, email, password, role='user' } = req.body;
   try {
-    const newUser = await createUser(req, name, email, password, role);
+    const { name, email, password, role = 'user' } = req.body;
+    const organization_id = req.organization.id;
+    const newUser = await createUserByAdmin(
+      req,
+      email,
+      name,
+      password,
+      organization_id,
+      role
+    );
 
     res.status(201).json({
       status: 'success',
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-      },
+      user: newUser,
+      message: 'User successfully created!',
     });
   } catch (error) {
     const errorMapping = {
       'You need to provide name, email and password': 400,
-      'The password must contain at least 8 characters': 400,
       'User already exists': 400,
     };
 
@@ -43,7 +52,10 @@ const registerUser = async (req, res) => {
 
 const getProfile = async (req, res) => {
   try {
-    const user = await getUserProfileById(req.user.userId);
+    const sub = req.user.sub;
+    const organization_id = req.organization.id;
+    const user = await findUserBySubAndOrganizationId(sub, organization_id);
+
     res.status(200).json({
       status: 'success',
       user,
@@ -54,57 +66,35 @@ const getProfile = async (req, res) => {
 };
 
 const updateProfile = async (req, res) => {
-  const { id } = req.params;
-  const { name, email } = req.body;
-
   try {
-    const updatedUser = await updateUserProfile(req, id, name, email, req.user);
+    const { id } = req.params;
+    const { name, email, sub } = req.body;
+    const organization_id = req.organization.id;
+
+    const updatedUser = await updateUserProfile(
+      req,
+      id,
+      name,
+      email,
+      req.user,
+      sub,
+      organization_id
+    );
 
     res.status(200).json({
       status: 'success',
       message: 'User Updated Successfully',
-      user: {
-        name: updatedUser.name,
-        email: updatedUser.email,
-        role: updatedUser.role,
-      },
+      user: updatedUser,
     });
   } catch (error) {
     const errorMapping = {
       'User not found': 400,
       'You need to provide id, email and name': 400,
-      'User already exists': 400
+      'User already exists': 400,
     };
 
     const statusCode = errorMapping[error.message] || 500;
     const message = statusCode === 500 ? 'Server error' : error.message;
-    return res.status(statusCode).json({
-      status: 'error',
-      message,
-    });
-  }
-};
-
-const changePassword = async (req, res) => {
-  const { id } = req.params;
-  const { password } = req.body;
-
-  try {
-  
-    await changeUserPassword(req, id, password, req.user);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Password has been changed successfully',
-    });
-  } catch (error) {
-    const errorMapping = {
-      'User not found': 400,
-    };
-
-    const statusCode = errorMapping[error.message] || 500;
-    const message = statusCode === 500 ? 'Server error' : error.message;
-
     return res.status(statusCode).json({
       status: 'error',
       message,
@@ -114,9 +104,9 @@ const changePassword = async (req, res) => {
 
 const archiveProfile = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { sub } = req.query.user;
 
-    await removeUser(req, id);
+    await removeUser(req, sub, req.user);
 
     res.status(200).json({
       status: 'success',
@@ -141,6 +131,5 @@ module.exports = {
   registerUser,
   getProfile,
   updateProfile,
-  archiveProfile,
-  changePassword,
+  archiveProfile
 };

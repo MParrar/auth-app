@@ -1,20 +1,28 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   Pagination,
   PaginationList,
   PaginationNext,
   PaginationPage,
   PaginationPrevious,
-} from "../components/pagination";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table";
-import { Text } from '../components/text'
+} from '../components/pagination';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/table';
+import { Text } from '../components/text';
+import { Tooltip } from './Tooltip';
 
 function PaginatedTable({ data, headers, rowsPerPage = 5, actions }) {
   const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(data.length / rowsPerPage);
+  const totalPages = Math.ceil(data?.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedData = data.slice(startIndex, startIndex + rowsPerPage);
+  const paginatedData = data?.slice(startIndex, startIndex + rowsPerPage);
 
   const handlePageChange = (page) => {
     if (page > 0 && page <= totalPages) {
@@ -27,41 +35,52 @@ function PaginatedTable({ data, headers, rowsPerPage = 5, actions }) {
       <Table>
         <TableHead>
           <TableRow>
-            {headers.map((header, index) => (
+            {headers?.map((header, index) => (
               <TableHeader key={index}>{header}</TableHeader>
             ))}
             {actions && <TableHeader>Actions</TableHeader>}
           </TableRow>
         </TableHead>
         <TableBody>
-          {
-          paginatedData?.length > 0 
-          ?
-          paginatedData.map((row, rowIndex) => (
-            <TableRow key={rowIndex}>
-              {headers.map((header, colIndex) => (
-                <TableCell key={colIndex} className={colIndex === 0 ? "font-medium" : ""}>
-                  {row[header?.toLowerCase()]}
-                </TableCell>
-              ))}
-              {actions && (
-                <TableCell>
-                  <div className="flex gap-2">{actions(row)}</div>
-                </TableCell>
-              )}
+          {paginatedData?.length > 0 ? (
+            paginatedData.map((row, rowIndex) => (
+              <TableRow key={rowIndex}>
+                {headers.map((header, colIndex) => (
+                  <TableCell
+                    key={colIndex}
+                    className={colIndex === 0 ? 'font-medium' : ''}
+                  >
+                    {row[header?.toLowerCase()]?.length > 30 ? (
+                      <Tooltip
+                        title={row[header?.toLowerCase()]?.slice(0, 30)}
+                        message={row[header?.toLowerCase()]}
+                      />
+                    ) : (
+                      row[header?.toLowerCase()]?.slice(0, 30)
+                    )}
+                  </TableCell>
+                ))}
+                {actions && (
+                  <TableCell>
+                    <div className='flex gap-2'>{actions(row)}</div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell
+                colSpan={headers.length + (actions ? 1 : 0)}
+                className='text-center'
+              >
+                <Text>No data available</Text>
+              </TableCell>
             </TableRow>
-          ))
-          :
-          <TableRow>
-          <TableCell colSpan={headers.length + (actions ? 1 : 0)} className="text-center">
-            <Text>No data available</Text>
-          </TableCell>
-        </TableRow>
-        }
+          )}
         </TableBody>
       </Table>
 
-      <Pagination className="mt-6">
+      <Pagination className='mt-6'>
         <PaginationPrevious
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}

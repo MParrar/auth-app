@@ -7,9 +7,9 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
     req.cookies = req.cookies || {};
     req.cookies.access_token = 'mockedAccessToken';
     req.userLogin = {
-      sub: 'auth0|mockUserId',
+      sub: 'auth0|mockUserIdUpdate',
       [`${process.env.AUTH0_NAME_SPACE}/subdomain`]: 'org',
-      [`${process.env.AUTH0_NAME_SPACE}/email`]: 'get@example.com',
+      [`${process.env.AUTH0_NAME_SPACE}/email`]: 'user_update@email.com',
     };
     next();
   }),
@@ -18,9 +18,9 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
     req.organization = { id: null, name: 'My Org', subdomain: 'org' };
     req.user = {
       id: 1,
-      sub: 'auth0|mockUserId',
+      sub: 'auth0|mockUserIdUpdate',
       name: 'Jane Doe',
-      email: 'get@example.com',
+      email: 'user_update@email.com',
       role: 'user',
     };
     next();
@@ -63,10 +63,25 @@ jest.mock('../../src/middlewares/authMiddleware', () => ({
   },
 }));
 
+jest.mock('../../src/services/auth0Services', () => ({
+  auth0: {
+    usersByEmail: {
+      getByEmail: jest.fn().mockResolvedValue({
+        data: {
+          email: userData.email,
+        },
+      }),
+    },
+    users: {
+      update: jest.fn().mockResolvedValue({}),
+    },
+  },
+}));
+
 const userData = {
-  email: 'get@example.com',
+  email: 'user_update@email.com', 
   name: 'Jane Doe',
-  sub: 'auth0|mockUserId',
+  sub: 'auth0|mockUserIdUpdate',
 };
 
 const organizationData = {
@@ -74,7 +89,7 @@ const organizationData = {
   subdomain: 'org',
 };
 
-describe('GET /api/users/profile', () => {
+describe('UPDATE /api/users/:id', () => {
   let userId;
   let organization_id;
 
@@ -136,20 +151,22 @@ describe('GET /api/users/profile', () => {
     await pool.end();
   });
 
-  describe('Get User Profile', () => {
-    it('Should return a 200 and the user info', async () => {
-      const { statusCode, body } = await supertest(app).get(
-        '/api/users/profile'
-      );
+  describe('Update user', () => {
+    it('Should return a 200 and update user', async () => {
+        const updatedName = 'John Updated';
+      const { statusCode, body } = await supertest(app)
+        .put(`/api/users/${userId}`)
+        .send({...userData, name:updatedName} );
       expect(statusCode).toBe(200);
       expect(body.status).toEqual('success');
+      expect(body.message).toEqual('User Updated Successfully');
       expect(body.user).toEqual({
         id: userId,
         sub: userData.sub,
-        name: userData.name,
+        name: updatedName,
         email: userData.email,
         role: 'user',
-        company_name: organizationData.name,
+        company_name: organizationData.name
       });
     });
   });
