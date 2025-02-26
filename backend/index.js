@@ -10,4 +10,6 @@ app.get('/health', (req, res) => {
         message: 'The service is up and running'
     });
     
-  });app.listen(port, () => console.log(`Server running on port ${port}`));
+  });
+  app.listen(port, () => console.log(`Server running on port ${port}`));
+  module.exports = app;
