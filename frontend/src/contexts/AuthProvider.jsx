@@ -83,6 +83,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
   };
 
   const showAuth0Login = () => {
+    console.log(getSubdomain())
     window.location.href = `${import.meta.env.VITE_BASE_API_URL}/login?subdomain=${getSubdomain()}`;
   };
 
