@@ -7,16 +7,15 @@ const uploadDocument = async (req, res) => {
   }
 
   const filePath = path.join(__dirname, '../../uploads', req.file.filename);
-  const WebSocket = req.app.get('ws');
   const fileExtension = path.extname(req.file.originalname);
   try {
     if(fileExtension === '.csv'){
       await validateFile(filePath);
-      await cleanAndGenerateNewFile(res, filePath, WebSocket);
+      await cleanAndGenerateNewFile(res, filePath);
     }
     if(fileExtension === '.xlsx' || fileExtension === '.xls'){
       await validateXLSXFile(filePath);
-      await processExcelFile(filePath,res, WebSocket);
+      await processExcelFile(filePath, res);
     }
   } catch (err) {
     console.log('Error reading file:', err.message);

@@ -11,8 +11,6 @@ import { Loading } from '../components/Loading';
 export const UploadDocuments = () => {
   const { user } = useContext(AuthContext);
   const [file, setFile] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [downloadComplete, setDownloadComplete] = useState(false);
   const axiosInstance = useAxios();
   const showNotification = useNotification();
   const { getRootProps, getInputProps } = useDropzone({
@@ -33,33 +31,6 @@ export const UploadDocuments = () => {
       uploadFile(selectedFile);
     },
   });
-
-  useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-
-    let ws;
-    let reconnectTimeout;
-  
-    const connect = () => {
-      ws = new WebSocket(`${protocol}://${import.meta.env.VITE_API_URL_TO_WEB_SOCKET}/progress`);
-  
-      ws.onopen = () => console.log('WebSocket connection established');
-      ws.onmessage = (event) => setProgress(JSON.parse(event.data).progress);
-      ws.onclose = () => {
-        reconnectTimeout = setTimeout(connect, 3000);
-      };
-    };
-  
-    connect();
-  
-    return () => {
-      clearTimeout(reconnectTimeout);
-      ws.onmessage = null;
-      ws.onerror = null;
-      ws.onclose = null;
-      ws.close();
-    };
-  }, [downloadComplete]);
 
   const uploadFile = async (file) => {
     const formData = new FormData();
@@ -83,11 +54,8 @@ export const UploadDocuments = () => {
           'File processed and downloaded successfully.'
         );
         setFile(null);
-        setProgress(0);
-        setDownloadComplete(true);
       } else {
         setFile(null);
-        setProgress(0);
         showNotification(
           'error',
           'An error occurred while processing the file.'
@@ -101,7 +69,6 @@ export const UploadDocuments = () => {
           try {
             const errorData = JSON.parse(reader.result);
             setFile(null);
-            setProgress(0);
             showNotification(
               'error',
               errorData.message ||
@@ -110,7 +77,6 @@ export const UploadDocuments = () => {
             console.error('Error response:', errorData);
           } catch (jsonError) {
             setFile(null);
-            setProgress(0);
             showNotification(
               'error',
               'An error occurred, but the error message could not be parsed.'
@@ -121,7 +87,6 @@ export const UploadDocuments = () => {
         reader.readAsText(error.response.data);
       } else {
         setFile(null);
-        setProgress(0);
         showNotification(
           'error',
           'An error occurred while processing the file.'
@@ -151,17 +116,7 @@ export const UploadDocuments = () => {
       <div className="mt-4">
         {file && <div className="text-white">{file.path}</div>}
       </div>
-      {file && progress > 0 && (
-        <div className="mt-4 w-full bg-gray-200 rounded-full">
-          <div
-            className="bg-gray-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full"
-            style={{ width: `${progress}%` }}
-          >
-            {progress.toFixed(2)}%
-          </div>
-        </div>
-      )}
-      {(file && progress === 0 ) && (
+      {(file ) && (
         <div
           style={{ marginTop: '-200px', height: '80vh', overflow: 'hidden'}}
           className="overflow-y-hidden"

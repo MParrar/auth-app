@@ -9,12 +9,10 @@ const fileRoutes = require('./routes/fileRoutes');
 const { auth } = require('express-openid-connect');
 const cookieParser = require('cookie-parser');
 const { auth0Config } = require('./middlewares/authMiddleware');
-const expressWs = require('express-ws');
 
 let SUBDOMAIN = '';
 dotenv.config();
 const app = express();
-expressWs(app);
 
 app.use(
   cors({
@@ -77,13 +75,6 @@ app.get('/api/user', (req, res) => {
   res.json({ isAuthenticated: false, user: null });
 });
 
-
-app.ws('/progress', (ws, req) => {
-  app.set('ws', ws);
-  ws.on('close', () => {
-    app.set('ws', null);
-  });
-});
 
 if (process.env.NODE_ENV !== 'test') {
   pool

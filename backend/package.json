@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "test": "cross-env NODE_ENV=test jest --coverage",
+    "start": "node src/server.js",
     "lint": "eslint ."
   },
   "author": "Matias Parra Rivas",
@@ -26,7 +27,6 @@
     "express-oauth2-jwt-bearer": "^1.6.0",
     "express-openid-connect": "^2.17.1",
     "express-session": "^1.18.1",
-    "express-ws": "^5.0.2",
     "fast-csv": "^5.0.2",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",

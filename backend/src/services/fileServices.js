@@ -29,7 +29,7 @@ const headers = [
   'Cum Prod Gas',
 ];
 
-const cleanAndGenerateNewFile = async (res, filePath, websocket) => {
+const cleanAndGenerateNewFile = async (res, filePath) => {
   const selectedHeaders = [
     'offer_id',
     'owner',
@@ -154,13 +154,6 @@ const cleanAndGenerateNewFile = async (res, filePath, websocket) => {
           results.push(selectedData);
         }
       }
-      if (websocket) {
-        websocket.send(
-          JSON.stringify({
-            progress: (processedLines / (totalLines - 1)) * 100,
-          })
-        );
-      }
     })
     .on('end', () => {
       const ws = fs.createWriteStream(outputFilePath);
@@ -272,7 +265,7 @@ const validateFile = (filePath) => {
   });
 };
 
-const processExcelFile = async (filePath, res, websocket) => {
+const processExcelFile = async (filePath, res) => {
   try {
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
@@ -281,13 +274,6 @@ const processExcelFile = async (filePath, res, websocket) => {
     const uniqueRecords = new Set();
     const processedData = jsonData
       .filter((data, index) => {
-        if (websocket) {
-            websocket.send(
-              JSON.stringify({
-                progress: (index / (jsonData.length - 1)) * 100,
-              })
-            );
-          }
         const dataKey = JSON.stringify(data);
         if (uniqueRecords.has(dataKey)) {
           return false;
