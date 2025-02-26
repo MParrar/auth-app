@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Heading } from '../components/heading';
 import { Divider } from '../components/divider';
