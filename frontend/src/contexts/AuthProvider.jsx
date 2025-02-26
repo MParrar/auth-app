@@ -18,7 +18,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
     try {
       setIsLoading(true);
       const response = await axiosInstance.get(
-        'http://localhost:5000/api/user',
+        `${import.meta.env.VITE_BASE_API_URL}/api/user`,
         { withCredentials: true }
       );
 
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children, initialUser = {} }) => {
     try {
       setIsLoading(true);
       const response = await axiosInstance.post(
-        'http://localhost:5000/api/login',
+        `${import.meta.env.VITE_BASE_API_URL}/api/login`,
         { withCredentials: true }
       );
 
